@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SVG to Canvas with Paper.js</title>
+    <!-- Load Paper.js -->
+    <script src="https://unpkg.com/paper@0.12.15/dist/paper-full.min.js"></script>
+    <style>
+        canvas {
+            font: 12px sans-serif;
+            border: 1px solid #ccc;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Upload an SVG</h2>
+
+<!-- force the file to be an svg -->
+<input type="file" id="svgFile" accept=".svg" />
+
+<!-- init an HTML5 canvas -->
+<canvas id="myCanvas" resize width="800" height="600"></canvas>
+
+<script>
+    // set up Paper.js, pass in canvas
+    paper.setup('myCanvas');
+
+    // event listener for file input
+    document.getElementById('svgFile').addEventListener('change', function(event) {
+    const file = event.target.files[0]; // get the first file from the input
+    if (!file) {
+        console.log("No file selected! Try again.");
+        return;
+    }
+
+    // use FileReader to read the SVG file
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const svgText = e.target.result; // convert svg file to text (circumvents local file restrictions) (ie u can't just use the file path bc that's a security risk)
+
+        paper.project.clear();
+
+        // import the SVG text into Paper.js
+        paper.project.importSVG(svgText, {
+        expand: true, // traverse the entire SVG (ie not just the top-level group)
+
+        onLoad: function(item) {
+            // on successfully loading the SVG, put it in the center of the canvas
+            item.position = paper.view.center;
+        },
+
+        onError: function(error) {
+          // if no success, log the error
+          console.error("Error importing SVG:", error);
+        }
+      });
+    };
+
+    // read the file as text (javascript does things weird, so we need to tell it what to do when the file is read before we read it)
+    reader.readAsText(file);
+  });
+</script>
+
+</body>
+</html>
