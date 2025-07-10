@@ -24,43 +24,70 @@
 <canvas id="myCanvas" resize width="800" height="600"></canvas>
 
 <script>
-    // set up Paper.js, pass in canvas
-    paper.setup('myCanvas');
+paper.setup('myCanvas');
 
-    // event listener for file input
-    document.getElementById('svgFile').addEventListener('change', function(event) {
-    const file = event.target.files[0]; // get the first file from the input
-    if (!file) {
-        console.log("No file selected! Try again.");
-        return;
-    }
+document.getElementById('svgFile').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    // use FileReader to read the SVG file
     const reader = new FileReader();
     reader.onload = function(e) {
-      const svgText = e.target.result; // convert svg file to text (circumvents local file restrictions) (ie u can't just use the file path bc that's a security risk)
-
+        const svgText = e.target.result;
         paper.project.clear();
 
-        // import the SVG text into Paper.js
         paper.project.importSVG(svgText, {
-        expand: true, // traverse the entire SVG (ie not just the top-level group)
+            expand: true, // traverse the entire SVG tree, not just the top-level group
+            onLoad: function(item) {
 
-        onLoad: function(item) {
-            // on successfully loading the SVG, put it in the center of the canvas
-            item.position = paper.view.center;
-        },
+                // get the bounds of the imported SVG
+                const bounds = item.bounds;
+                const minX = bounds.left;
+                const maxX = bounds.right;
+                const minY = bounds.top;
+                const maxY = bounds.bottom;
 
-        onError: function(error) {
-          // if no success, log the error
-          console.error("Error importing SVG:", error);
-        }
-      });
+                const timeScale = (x) => {
+                    return ((x - minX) / (maxX - minX)) * 60; // normalize to a 0 to 1 scale then multiply by 60 seconds
+                };
+
+                const thicknessScale = (y) => {
+                    return ((maxY - y) / (maxY - minY)) * 5; // normalize to a 0 to 1 scale then multiply by 5 for a max wall thickness of 5mm
+                };
+
+                const csvRows = [["time", "thickness"]]; // header row
+                item.children.forEach(child => { // svg might have multiple paths or groups, loop through each of those
+                    if (child instanceof paper.Path) { // loop through each of the paths (straight lines)
+                        const len = child.length; // gets the length of the path
+                        const step = 1; // sample for every 1 pixel
+
+                        for (let i = 0; i <= len; i += step) { // for each 1 pixel in the range of this line
+                            const pt = child.getPointAt(i); //get the point
+                            if (pt) {
+                                const time = timeScale(pt.x).toFixed(2); // time == points on x-axis
+                                const thickness = thicknessScale(pt.y).toFixed(2); // thickness == points on y-axis
+                                csvRows.push([time, thickness]);
+                            }
+                        }
+                    }
+                });
+
+                // Convert to CSV format
+                const csvContent = csvRows.map(row => row.join(",")).join("\n");
+
+                // Trigger CSV download
+                const blob = new Blob([csvContent], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                console.log("CSV rows:", csvRows);
+                a.download = "slipcast_wall_profile.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        });
     };
-
-    // read the file as text (javascript does things weird, so we need to tell it what to do when the file is read before we read it)
     reader.readAsText(file);
-  });
+});
 </script>
 
 </body>
